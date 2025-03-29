@@ -7,12 +7,13 @@ from .serializers import EventSerializer
 # Create your views here.
 
 
-class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin):
+class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
     
-    def perform_create(self, serializer):
-        serializer.save(creator=self.request.user) 
+    # def perform_create(self, serializer):
+    #     if self.request.user :
+    #         serializer.save(creator=self.request.user)
 
 
     

@@ -12,7 +12,7 @@ class Event(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     capacity = models.IntegerField()
-    creator = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    creator = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     location = models.CharField(max_length=255)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
