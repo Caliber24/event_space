@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'core',
     'event_module',
 ]
@@ -79,10 +80,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'event_db',
-        'USER' : 'root',
-        'PASSWORD' : '3831Amir',
-        'HOST' : 'localhost',
-        'PORT' : '3306',
+        'USER': 'root',
+        'PASSWORD': '3831Amir',
+        'HOST': 'localhost',
+        'PORT': '3306',
     }
 }
 
