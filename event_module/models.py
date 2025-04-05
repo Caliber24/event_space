@@ -18,6 +18,8 @@ class Event(models.Model):
     start_date = models.DateTimeField()
     
     status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=0)
+    participants = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='events', blank=True)
+    
     
     def __str__(self):
         return f"{self.title} - {self.creator.email}"

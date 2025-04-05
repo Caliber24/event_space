@@ -29,7 +29,7 @@ class CreateRetrieveUpdateUserViewset(GenericViewSet, CreateModelMixin, Retrieve
             return [IsOwner()]
 
     def retrieve(self, request, *args, **kwargs):
-        email = kwargs.get('email')
+        email = kwargs.get('ema1il')
         user = get_object_or_404(User, email=email)
         serializer = self.get_serializer(user)
         return Response(serializer.data)
