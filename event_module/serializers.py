@@ -52,4 +52,4 @@ class JoinEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = ['id', 'event_title', 'user_email']
-    
+

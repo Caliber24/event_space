@@ -32,7 +32,7 @@ class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateMo
 
     def perform_create(self, serializer):
         serializer.save(creator_id=self.request.user)
-
+    
 
 class JoinEventView(APIView):
     permission_classes = [IsAuthenticated]
@@ -41,6 +41,23 @@ class JoinEventView(APIView):
         event_id = self.kwargs.get('event_id')
         event = get_object_or_404(Event, pk=event_id)
 
+        event_status = event_service.check_status_event(event)
+        if event_status is True:
+            data = {
+                "error": 'این رویداد به اتمام رسیده است'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+        elif event_status is False:
+            data = {
+                "error": 'این رویداد کنسل شده است'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+
+        if event_service.check_event_capacity_and_cancel(event):
+            data = {
+                "error": 'این رویداد بدلیل به حد نصاب نرسیدن(ده درصد ظرفیت ) ظرفیت کنسل شده است'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
         if not event_service.check_capacity(event):
             data = {
                 "error": 'ظرفیت رویداد پر شده است'
@@ -60,12 +77,18 @@ class JoinEventView(APIView):
             return Response(data, status=HTTP_400_BAD_REQUEST)
 
         event_service.add_participant(event, request.user)
-        
+
         data_to_serializer = {
             'event': event,
             'user': request.user
         }
+
         serializer = JoinEventSerializer(data=data_to_serializer)
         serializer.is_valid(raise_exception=True)
-        
+
         return Response(serializer.data, status=HTTP_200_OK)
+
+class LeaveShowMyEvent(GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
+    permission_classes = [IsAuthenticated]
+    def get_queryset(self):
+        return Event.objects.prefetch_related('participants').filter(participants=self.request.user)
