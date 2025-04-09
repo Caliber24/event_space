@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import mixins
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.status import (HTTP_200_OK, HTTP_201_CREATED,
+from rest_framework.status import (HTTP_200_OK, HTTP_202_ACCEPTED,
                                    HTTP_400_BAD_REQUEST)
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
@@ -10,26 +10,23 @@ from rest_framework.viewsets import GenericViewSet
 from utils.permissions import IsOwner
 
 from .models import Event
-from .serializers import (EventDetailSerializer, EventSerializer,
-                          JoinEventSerializer)
+from .serializers import (ChangeStatusEventSerializer, EventDetailSerializer,
+                          EventSerializer, JoinEventSerializer)
 from .services import event_service
 
-# from rest_framework.permissions import
-# Create your views here.
 
-
-class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin):
-
-    permission_classes = [IsAuthenticated]
+class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
+                          mixins.UpdateModelMixin):
 
     def get_queryset(self):
-        return Event.objects.prefetch_related('participants').filter(status=0)
+        return Event.objects.filter(status=0).prefetch_related('participants')
 
-    # def get_permissions(self):
-    #     if self.action in ['create', 'retrieve', 'update', 'partial_update']:
-    #         return [IsOwner()]
-    #     else:
-    #         return [IsAuthenticated()]
+    def get_permissions(self):
+        if self.action == 'create':
+            return [IsAuthenticated()]
+        elif self.action == 'list':
+            return []
+        return [IsOwner()]
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -50,38 +47,21 @@ class JoinEventView(APIView):
 
         event_status = event_service.check_status_event(event)
         if event_status is True:
-            data = {
-                "error": 'این رویداد به اتمام رسیده است'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
+            return Response({"error": "This event has ended."}, status=HTTP_400_BAD_REQUEST)
         if event_status is False:
-            data = {
-                "error": 'این رویداد کنسل شده است'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
+            return Response({"error": "This event has been canceled."}, status=HTTP_400_BAD_REQUEST)
 
         if event_service.check_event_capacity_and_cancel(event):
-            data = {
-                "error": 'این رویداد بدلیل به حد نصاب نرسیدن(ده درصد ظرفیت ) ظرفیت کنسل شده است'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
+            return Response({"error": "This event was canceled due to insufficient capacity."},
+                            status=HTTP_400_BAD_REQUEST)
         if not event_service.check_capacity(event):
-            data = {
-                "error": 'ظرفیت رویداد پر شده است'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
+            return Response({"error": "The event is full."}, status=HTTP_400_BAD_REQUEST)
 
         if event_service.check_event_creator(event, request.user):
-            data = {
-                'error': 'شما سازنده رویداد هستید'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
+            return Response({"error": "You are the creator of this event."}, status=HTTP_400_BAD_REQUEST)
 
         if event_service.check_event_participant(event, request.user):
-            data = {
-                "error": "شما در این  رویداد عضو شده اید"
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
+            return Response({"error": "You are already a participant in this event."}, status=HTTP_400_BAD_REQUEST)
 
         event_service.add_participant(event, request.user)
 
@@ -96,70 +76,62 @@ class JoinEventView(APIView):
         return Response(serializer.data, status=HTTP_200_OK)
 
 
-class LeaveShowMyEventParticipant(GenericViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin , mixins.DestroyModelMixin):
+class LeaveShowMyEventParticipant(GenericViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                                  mixins.DestroyModelMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = EventSerializer
 
     def get_queryset(self):
-        return Event.objects.prefetch_related('participants').filter(participants=self.request.user)
+        if getattr(self, 'swagger_fake_view', False):
+            return Event.objects.none()
 
-    def destroy(self, request, *args, **kwargs):
-        event = self.get_object()
-        if event_service.check_event_creator(event, request.user):
-            data = {
-                "error": 'شما سازنده رویداد هستید و نمیتوانید از آن خارج شوید'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
-
-        if event_service.check_time_remaining_event(event):
-            data = {
-                'error': 'بدلیل اینکه 1 ساعت دیگر رویداد شروع میشود، نمیتوانید از رویداد خارج شوید'
-            }
-
-            return Response(data, status=HTTP_400_BAD_REQUEST)
-
-        event_service.remove_participant(event, request.user)
-        data = {
-            'data': 'شما از رویداد خارج شدید'
-        }
-        return Response(data, status=HTTP_200_OK)
+        if self.request.user.is_authenticated:
+            queryset = Event.objects.filter(participants=self.request.user)
+            return queryset.prefetch_related('participants')
+        return Event.objects.none()
 
 
-class CancelledShowMyEventCreate(GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin):
-    permission_classes = []
-    serializer_class = EventSerializer
+class ChangeStatusShowMyEventCreate(GenericViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                                    mixins.UpdateModelMixin):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangeStatusEventSerializer
 
     def get_queryset(self):
-        return Event.objects.prefetch_related('participants').filter(creator=self.request.user)
+        if getattr(self, 'swagger_fake_view', False):
+            return Event.objects.none()
 
-    def destroy(self, request, *args, **kwargs):
+        if self.request.user.is_authenticated:
+            queryset = Event.objects.filter(creator=self.request.user)
+            return queryset.prefetch_related('participants')
+        return Event.objects.none()
+
+    def update(self, request, *args, **kwargs):
         event = self.get_object()
         event_status = event_service.check_status_event(event)
         if event_status is True:
-            data = {
-                "error": 'این رویداد به اتمام رسیده است'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
-        if not event_status:
-            data = {
-                'error': 'این رویداد از پیش کنسل شده است'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
+            return Response({"error": "This event has ended."}, status=HTTP_400_BAD_REQUEST)
 
-        if not event_service.check_capacity(event):
-            data = {
-                "error": ' ظرفیت رویداد پر شده است و شما نمیتوانید کنسل کنید'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
-        
-        if event_service.check_time_remaining_event(event):
-            data = {
-                'error': 'بدلیل اینکه 1 ساعت دیگر رویداد شروع میشود، نمیتوانید از رویداد را کنسل کنید.'
-            }
-            return Response(data, status=HTTP_400_BAD_REQUEST)
-        
-        event.delete()
-        data = {
-            'data': 'شما رویداد را کنسل کردید'
-        }
-        return Response(data, status=HTTP_200_OK)
+        if event_status is False:
+            return Response({"error": "This event has been canceled."}, status=HTTP_400_BAD_REQUEST)
+
+        event_status = int(request.data.get('status'))
+        if event_status == 1:
+            if not event_service.check_time_after_start_date(event):
+                return Response({"error": "This event has not started yet."}, status=HTTP_400_BAD_REQUEST)
+            event.status = 1
+            serializer = self.get_serializer(event, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=HTTP_202_ACCEPTED)
+
+        if event_status == 2:
+            if not event_service.check_capacity(event):
+                return Response({"error": "The event is full and cannot be canceled."}, status=HTTP_400_BAD_REQUEST)
+
+            event.status = 2
+            serializer = self.get_serializer(event, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=HTTP_202_ACCEPTED)
+
+        return Response({'error': 'Invalid input'}, status=HTTP_200_OK)

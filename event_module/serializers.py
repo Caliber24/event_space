@@ -13,7 +13,7 @@ class EventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Event
-        fields = ('id', 'title', 'description', 'capacity', 'creator_id',
+        fields = ('id', 'title', 'description', 'price', 'capacity', 'creator_id',
                   'creator_email', 'location', 'start_date', 'participants_count')
         read_only_fields = ('id', 'creator_id', 'creator_email')
 
@@ -21,10 +21,25 @@ class EventSerializer(serializers.ModelSerializer):
         return object.participants.count()
 
 
+class ChangeStatusEventSerializer(serializers.ModelSerializer):
+    creator_email = serializers.CharField(
+        source='creator.email', read_only=True)
+    participants_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = ('id', 'title', 'description', 'price', 'capacity', 'creator_id',
+                  'creator_email', 'location', 'start_date','status', 'participants_count')
+        read_only_fields = ('id', 'title', 'description', 'capacity', 'creator_id',
+                  'creator_email', 'location', 'start_date', 'participants_count')
+
+    def get_participants_count(self, object: Event):
+        return object.participants.count()
+
 
 class SimpleUserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User,
+        model = User
         fields=('id','email',)
         
         
@@ -37,7 +52,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Event
-        fields = ('id', 'title', 'description', 'capacity', 'creator_id',
+        fields = ('id', 'title', 'description', 'price', 'capacity', 'creator_id',
                   'creator_email', 'location', 'start_date', 'participants_count', 'participants')
         read_only_fields = ('id', 'creator_id', 'creator_email')
 

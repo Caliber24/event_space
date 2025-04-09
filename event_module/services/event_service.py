@@ -6,12 +6,15 @@ def check_status_event(event):
     """
     Check if the event is completed or cancelled based on its status.
     """
-
+    
     if event.status == 1:
+        print(1)
         return True
     elif event.status == 2:
+        print(2)
         return False
     else:
+        print(3)
         return None
 
 
@@ -24,7 +27,13 @@ def check_time_remaining_event(event):
 
     if time_remaining <= timedelta(hours=1):
         return True  
-    return False  
+    return False 
+
+def check_time_after_start_date(event):
+    if timezone.now() - event.start_date>timezone.timedelta(seconds=0):
+        return True
+    return False
+     
 
 
 def check_event_capacity_and_cancel(event):
