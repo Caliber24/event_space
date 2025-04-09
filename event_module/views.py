@@ -19,20 +19,27 @@ from .services import event_service
 
 
 class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin):
-    queryset = Event.objects.prefetch_related('participants').all()
 
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Event.objects.prefetch_related('participants').filter(status=1)
+
+    # def get_permissions(self):
+    #     if self.action in ['create', 'retrieve', 'update', 'partial_update']:
+    #         return [IsOwner()]
+    #     else:
+    #         return [IsAuthenticated()]
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return EventDetailSerializer
         else:
             return EventSerializer
-    # def get_permissions(self):
 
     def perform_create(self, serializer):
         serializer.save(creator_id=self.request.user)
-    
+
 
 class JoinEventView(APIView):
     permission_classes = [IsAuthenticated]
@@ -47,7 +54,7 @@ class JoinEventView(APIView):
                 "error": 'این رویداد به اتمام رسیده است'
             }
             return Response(data, status=HTTP_400_BAD_REQUEST)
-        elif event_status is False:
+        if event_status is False:
             data = {
                 "error": 'این رویداد کنسل شده است'
             }
@@ -88,7 +95,71 @@ class JoinEventView(APIView):
 
         return Response(serializer.data, status=HTTP_200_OK)
 
-class LeaveShowMyEvent(GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
+
+class LeaveShowMyEventParticipant(GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
     permission_classes = [IsAuthenticated]
+    serializer_class = EventSerializer
+
     def get_queryset(self):
         return Event.objects.prefetch_related('participants').filter(participants=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        event = self.get_object()
+        if event_service.check_event_creator(event, request.user):
+            data = {
+                "error": 'شما سازنده رویداد هستید و نمیتوانید از آن خارج شوید'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+
+        if event_service.check_time_remaining_event(event):
+            data = {
+                'error': 'بدلیل اینکه 1 ساعت دیگر رویداد شروع میشود، نمیتوانید از رویداد خارج شوید'
+            }
+
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+
+        event_service.remove_participant(event, request.user)
+        data = {
+            'data': 'شما از رویداد خارج شدید'
+        }
+        return Response(data, status=HTTP_200_OK)
+
+
+class CancelledShowMyEventCreate(GeneratorExit, mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin):
+    permission_classes = [IsAuthenticated, IsOwner]
+    serializer_class = EventSerializer
+
+    def get_queryset(self):
+        return Event.objects.prefetch_related('participants').filter(creator=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        event = self.get_object()
+        event_status = event_service.check_status_event(event)
+        if event_status is True:
+            data = {
+                "error": 'این رویداد به اتمام رسیده است'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+        if not event_status:
+            data = {
+                'error': 'این رویداد از پیش کنسل شده است'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+
+        if not event_service.check_capacity(event):
+            data = {
+                "error": ' ظرفیت رویداد پر شده است و شما نمیتوانید کنسل کنید'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+        
+        if event_service.check_time_remaining_event(event):
+            data = {
+                'error': 'بدلیل اینکه 1 ساعت دیگر رویداد شروع میشود، نمیتوانید از رویداد را کنسل کنید.'
+            }
+            return Response(data, status=HTTP_400_BAD_REQUEST)
+        
+        event.delete()
+        data = {
+            'data': 'شما رویداد را کنسل کردید'
+        }
+        return Response(data, status=HTTP_200_OK)
