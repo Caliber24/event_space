@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -6,9 +7,9 @@ from rest_framework.status import (HTTP_200_OK, HTTP_202_ACCEPTED,
                                    HTTP_400_BAD_REQUEST)
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
-
+from rest_framework.filters import SearchFilter, OrderingFilter
 from utils.permissions import IsOwner
-
+from .filters import EventFilter
 from .models import Event
 from .serializers import (ChangeStatusEventSerializer, EventDetailSerializer,
                           EventSerializer, JoinEventSerializer)
@@ -17,7 +18,10 @@ from .services import event_service
 
 class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
                           mixins.UpdateModelMixin):
-
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = EventFilter
+    search_fields = ['title','description','creator__email']
+    ordering_fields = ['start_date', 'title','price']
     def get_queryset(self):
         return Event.objects.filter(status=0).prefetch_related('participants')
 
@@ -80,7 +84,8 @@ class LeaveShowMyEventParticipant(GenericViewSet, mixins.ListModelMixin, mixins.
                                   mixins.DestroyModelMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = EventSerializer
-
+    filter_backends = [OrderingFilter]
+    ordering_fields = ['start_date', 'title', 'price']
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return Event.objects.none()
@@ -95,7 +100,8 @@ class ChangeStatusShowMyEventCreate(GenericViewSet, mixins.ListModelMixin, mixin
                                     mixins.UpdateModelMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = ChangeStatusEventSerializer
-
+    filter_backends = [OrderingFilter]
+    ordering_fields = ['start_date', 'title', 'price']
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return Event.objects.none()

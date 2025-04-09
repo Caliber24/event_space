@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'drf_yasg',
+    'django_filters',
     'rest_framework',
     'rest_framework_simplejwt',
     'core',
@@ -149,4 +150,17 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_LIFETIME_LATE_USER': timedelta(days=1),
     'SLIDING_TOKEN_LIFETIME_LATE_USER': timedelta(days=30),
     'UPDATE_LAST_LOGIN': True,
+}
+
+
+
+SWAGGER_SETTINGS  = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+            'in': 'header',
+        },
+    },
 }
