@@ -23,7 +23,7 @@ class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateMo
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Event.objects.prefetch_related('participants').filter(status=1)
+        return Event.objects.prefetch_related('participants').filter(status=0)
 
     # def get_permissions(self):
     #     if self.action in ['create', 'retrieve', 'update', 'partial_update']:
@@ -38,7 +38,7 @@ class ListCreateEventView(GenericViewSet, mixins.ListModelMixin, mixins.CreateMo
             return EventSerializer
 
     def perform_create(self, serializer):
-        serializer.save(creator_id=self.request.user)
+        serializer.save(creator_id=self.request.user.id)
 
 
 class JoinEventView(APIView):
@@ -96,7 +96,7 @@ class JoinEventView(APIView):
         return Response(serializer.data, status=HTTP_200_OK)
 
 
-class LeaveShowMyEventParticipant(GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin):
+class LeaveShowMyEventParticipant(GenericViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin , mixins.DestroyModelMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = EventSerializer
 
@@ -125,8 +125,8 @@ class LeaveShowMyEventParticipant(GenericViewSet, mixins.ListModelMixin, mixins.
         return Response(data, status=HTTP_200_OK)
 
 
-class CancelledShowMyEventCreate(GeneratorExit, mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin):
-    permission_classes = [IsAuthenticated, IsOwner]
+class CancelledShowMyEventCreate(GenericViewSet, mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin):
+    permission_classes = []
     serializer_class = EventSerializer
 
     def get_queryset(self):
